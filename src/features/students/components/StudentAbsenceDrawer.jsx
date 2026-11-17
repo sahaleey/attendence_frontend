@@ -286,7 +286,14 @@ export default function StudentAbsenceDrawer({ student, onClose }) {
               {/* Summary */}
               <div className="grid grid-cols-2 gap-3 p-5 sm:grid-cols-4">
                 <div className="col-span-2 rounded-xl border border-slate-800 bg-slate-950/50 p-3 sm:col-span-1">
-                  <p className="text-[11px] text-slate-500">Attendance</p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-[11px] text-slate-500">Attendance</p>
+                    {pct != null && (
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${pct >= 75 ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-red-500/10 text-red-400 border border-red-500/20"}`}>
+                        {pct >= 75 ? "Eligible (≥75%)" : "At Risk (<75%)"}
+                      </span>
+                    )}
+                  </div>
                   <p className={`mt-0.5 text-2xl font-semibold ${pctTone}`}>
                     {pct == null ? "—" : `${pct}%`}
                   </p>

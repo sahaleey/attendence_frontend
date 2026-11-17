@@ -1,4 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
+import StatCard from "../../../shared/components/ui/StatCard";
+import ExportButton from "../../../shared/components/ui/ExportButton";
+import { TrendingUp, ClipboardCheck, Users, AlertCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 import { attendanceDashboardApi } from "../api/attendance-dashboard.api";
 import { get } from "../../../shared/api/client";
@@ -129,6 +132,35 @@ export default function AttendanceDashboard() {
     };
   }, []);
 
+  const matrixExportRows = useMemo(() => {
+    if (!report?.standards) return [];
+    const rows = [];
+    report.standards.forEach((row) => {
+      row.cells.forEach((cell) => {
+        if (cell.hasSession) {
+          rows.push({
+            date,
+            standard: row.standard?.name || "—",
+            period: cell.periodId,
+            subject: cell.subject?.name || "—",
+            staff: cell.staff?.name || "—",
+            status: cell.sessionStatus,
+            present: cell.presentCount,
+            absent: cell.absentCount,
+          });
+        }
+      });
+    });
+    return rows;
+  }, [report, date]);
+
+  const totalPresent = report?.summary?.totalPresent || 0;
+  const totalAbsent = report?.summary?.totalAbsent || 0;
+  const markedSessions = report?.summary?.markedSessions || 0;
+  const totalSessions = report?.summary?.totalSessions || 0;
+  const pendingSessions = report?.summary?.pendingSessions || 0;
+  const attendanceRate = totalPresent + totalAbsent > 0 ? Math.round((totalPresent / (totalPresent + totalAbsent)) * 100) : 0;
+
   return (
     <div className="min-h-screen bg-ui-page text-ui-ink">
       <div className="mx-auto px-4 py-6 md:px-6">
@@ -143,6 +175,20 @@ export default function AttendanceDashboard() {
           </div>
 
           <div className="flex items-center gap-2">
+            <ExportButton
+              filename={`attendance_matrix_${date}`}
+              headers={[
+                { label: "Date", key: "date" },
+                { label: "Standard", key: "standard" },
+                { label: "Subject", key: "subject" },
+                { label: "Staff", key: "staff" },
+                { label: "Status", key: "status" },
+                { label: "Present", key: "present" },
+                { label: "Absent", key: "absent" },
+              ]}
+              data={matrixExportRows}
+              label="Export CSV"
+            />
             <Link
               to="/attendance/generate"
               className="rounded-lg border border-ui-line-strong bg-ui-surface px-4 py-2.5 text-[12px] font-medium text-ui-ink-2 transition hover:bg-ui-surface-2"
@@ -167,6 +213,38 @@ export default function AttendanceDashboard() {
             />
           </div>
         </header>
+
+        {/* KPI Stat Cards */}
+        <section className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard
+            title="Attendance Rate"
+            value={reportLoading ? "—" : `${attendanceRate}%`}
+            icon={TrendingUp}
+            variant={attendanceRate >= 80 ? "success" : attendanceRate >= 60 ? "warning" : "danger"}
+            description={`${totalPresent} present · ${totalAbsent} absent`}
+          />
+          <StatCard
+            title="Sessions Marked"
+            value={reportLoading ? "—" : `${markedSessions} / ${totalSessions}`}
+            icon={ClipboardCheck}
+            variant={markedSessions === totalSessions && totalSessions > 0 ? "success" : "info"}
+            description="Completed attendance sessions"
+          />
+          <StatCard
+            title="Students Present"
+            value={reportLoading ? "—" : totalPresent}
+            icon={Users}
+            variant="success"
+            description="Across all classes today"
+          />
+          <StatCard
+            title="Pending Sessions"
+            value={reportLoading ? "—" : pendingSessions}
+            icon={AlertCircle}
+            variant={pendingSessions > 0 ? "warning" : "default"}
+            description="Sessions requiring marking"
+          />
+        </section>
 
         {/* Class × period attendance session matrix */}
         <section className="overflow-hidden rounded-xl border border-ui-line bg-ui-surface">

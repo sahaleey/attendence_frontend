@@ -7,9 +7,12 @@ import Modal from "../../../shared/components/Modal";
 import { Loading, ErrorState, Empty } from "../../../shared/components/State";
 import { useAuth } from "../../../shared/context/AuthContext";
 import P from "../../../shared/access/permissions";
+import { useToast } from "../../../shared/components/ui/Toast";
+import ExportButton from "../../../shared/components/ui/ExportButton";
 
 export default function Staff() {
   const { hasPermission } = useAuth();
+  const { pushToast } = useToast();
   const canCreate = hasPermission(P.STAFF_CREATE);
   const canUpdate = hasPermission(P.STAFF_UPDATE);
   const [rows, setRows] = useState(null);
@@ -89,7 +92,7 @@ export default function Staff() {
       setModal(false);
       await load();
     } catch (e) {
-      alert(e.message || "Failed to save staff member");
+      pushToast(e.message || "Failed to save staff member", "error");
     } finally {
       setSaving(false);
     }

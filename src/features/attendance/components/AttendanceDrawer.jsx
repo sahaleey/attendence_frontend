@@ -1,7 +1,7 @@
-import { useEffect, useRef } from "react";
-import { CheckCheck, CheckCircle2, CalendarOff, Users, UserCheck, X } from "lucide-react";
-import {ConfirmLeaveDialog} from "./ConfirmLeaveDialog";
-import {ConfirmSubmitDialog} from "./ConfirmSubmitDialog ";
+import { useEffect, useRef, useState, useMemo } from "react";
+import { CheckCheck, CheckCircle2, CalendarOff, Users, UserCheck, X, Search, Sparkles } from "lucide-react";
+import { ConfirmLeaveDialog } from "./ConfirmLeaveDialog";
+import { ConfirmSubmitDialog } from "./ConfirmSubmitDialog ";
 import StatusBadge from "./StatusBadge";
 import StatusToggle from "../../../shared/components/StatusToggle";
 
@@ -25,10 +25,11 @@ export default function AttendanceDrawer({
   onLeaveReasonChange,
 }) {
   const closeButtonRef = useRef(null);
+  const [search, setSearch] = useState("");
 
   // Normalize: support both flat shape and { session, students } shape
   const session = detail?.session ?? detail;
-  const students = detail?.students ?? detail?.students ?? [];
+  const students = detail?.students ?? [];
 
   useEffect(() => {
     if (!session) return;
@@ -44,6 +45,17 @@ export default function AttendanceDrawer({
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [session, confirmOpen, leaveConfirmOpen, onClose]);
 
+  const filteredStudents = useMemo(() => {
+    if (!search.trim()) return students;
+    const q = search.toLowerCase();
+    return students.filter((s) => {
+      const name = String(s.name || s.studentName || "").toLowerCase();
+      const roll = String(s.rollNo ?? s.rollNumber ?? "");
+      const adm = String(s.admissionNo || "").toLowerCase();
+      return name.includes(q) || roll.includes(q) || adm.includes(q);
+    });
+  }, [students, search]);
+
   if (!session) return null;
 
   const sessionStatus = String(session.sessionStatus || "PENDING").toUpperCase();
@@ -58,9 +70,12 @@ export default function AttendanceDrawer({
     (student) => String(student.status || "PRESENT").toUpperCase() === "ABSENT"
   ).length;
 
+  const totalCount = students.length;
+  const presentPercent = totalCount > 0 ? Math.round((presentCount / totalCount) * 100) : 0;
+
   return (
     <div
-      className="fixed inset-0 z-50 mb-3 bg-black/60 backdrop-blur-sm pb-3"
+      className="fixed inset-0 z-50 mb-3 bg-black/60 backdrop-blur-sm pb-3 animate-in fade-in duration-200"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
@@ -71,25 +86,23 @@ export default function AttendanceDrawer({
         onClick={(event) => event.stopPropagation()}
       >
         {/* HEADER */}
-        <div className="flex items-center justify-between border-b border-slate-800 px-5 py-4">
+        <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4">
           <div className="min-w-0">
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-600">
-              Attendance session
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+              Live Attendance Room
             </span>
 
             <h2
               id="attendance-drawer-title"
-              className="mt-1 truncate text-lg font-semibold text-slate-100"
+              className="mt-0.5 truncate text-lg font-bold text-slate-100"
             >
-              {session.subject?.name || session.subjectName || "Attendance"}
+              {session.subject?.name || session.subjectName || "Attendance Session"}
             </h2>
 
-            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-              <span>{session.standard?.name || session.standardName || "—"}</span>
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-400">
+              <span className="font-semibold text-slate-300">{session.standard?.name || session.standardName || "—"}</span>
               <span>•</span>
-              <span>
-                Period {session.period?.periodIndex ?? session.periodIndex ?? "—"}
-              </span>
+              <span>Period {session.period?.periodIndex ?? session.periodIndex ?? "—"}</span>
               {(session.period?.startTime || session.startTime) && (
                 <>
                   <span>•</span>
@@ -107,63 +120,83 @@ export default function AttendanceDrawer({
             type="button"
             onClick={onClose}
             aria-label="Close attendance drawer"
-            className="ml-4 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-800 text-slate-500 transition hover:bg-slate-800 hover:text-slate-200"
+            className="ml-4 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-800 text-slate-400 transition hover:bg-slate-800 hover:text-slate-100"
           >
             <X size={18} />
           </button>
         </div>
 
-        {/* SESSION STATUS */}
-        <div className="border-b border-slate-800 px-5 py-3">
+        {/* LIVE METRICS PROGRESS BAR */}
+        <div className="border-b border-slate-800/80 bg-slate-900/30 px-6 py-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <StatusBadge status={sessionStatus} />
 
-            <div className="flex items-center gap-4 text-xs text-slate-600">
-              <span>{presentCount} present</span>
-              <span>{absentCount} absent</span>
-              <span>{students.length} total</span>
+            <div className="flex items-center gap-4 text-xs font-medium">
+              <span className="text-emerald-400">{presentCount} present ({presentPercent}%)</span>
+              <span className="text-red-400">{absentCount} absent</span>
+              <span className="text-slate-400">{totalCount} total</span>
             </div>
           </div>
 
-          {isEditable && students.length > 0 && (
-            <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={onMarkAllPresent}
-                disabled={busy || leaveBusy}
-                className="flex items-center gap-1.5 rounded-lg border border-slate-800 px-3 py-1.5 text-[11px] font-medium text-slate-400 transition hover:bg-slate-900 hover:text-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <CheckCheck size={13} />
-                Mark all present
-              </button>
+          {/* Dual-tone Progress Bar */}
+          <div className="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-800">
+            <div
+              className="h-full bg-emerald-500 transition-all duration-300"
+              style={{ width: `${presentPercent}%` }}
+            />
+          </div>
 
-              <button
-                type="button"
-                onClick={onRequestLeave}
-                disabled={busy || leaveBusy}
-                className="flex items-center gap-1.5 rounded-lg border border-purple-500/30 bg-purple-500/10 px-3 py-1.5 text-[11px] font-medium text-purple-300 transition hover:bg-purple-500/20 hover:text-purple-200 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <CalendarOff size={13} />
-                Mark leave
-              </button>
+          {/* Actions Bar & Quick Search */}
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2.5">
+            <div className="relative flex-1 max-w-xs">
+              <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Find student by name or roll..."
+                className="w-full rounded-xl border border-slate-800 bg-slate-900/80 py-1.5 pl-8 pr-3 text-xs text-slate-200 outline-hidden transition focus:border-slate-600"
+              />
             </div>
-          )}
+
+            {isEditable && students.length > 0 && (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={onMarkAllPresent}
+                  disabled={busy || leaveBusy}
+                  className="flex items-center gap-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-300 transition hover:bg-emerald-500/20 disabled:opacity-50"
+                >
+                  <CheckCheck size={14} />
+                  <span>Mark All Present</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={onRequestLeave}
+                  disabled={busy || leaveBusy}
+                  className="flex items-center gap-1.5 rounded-xl border border-purple-500/30 bg-purple-500/10 px-3 py-1.5 text-xs font-semibold text-purple-300 transition hover:bg-purple-500/20 disabled:opacity-50"
+                >
+                  <CalendarOff size={13} />
+                  <span>Staff Leave</span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* BODY */}
-        <div className="max-h-[calc(94vh-190px)] flex-1 overflow-y-auto">
+        {/* BODY (STUDENTS LIST) */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-3">
           {!isEditable && !isStaffLeave && (
-            <div className="mx-5 mt-4 rounded-xl border border-slate-800 bg-slate-900/50 p-4">
+            <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4">
               <div className="flex gap-3">
                 <CheckCircle2 size={18} className="mt-0.5 shrink-0 text-emerald-400" />
                 <div>
-                  <p className="text-sm font-medium text-slate-200">
-                    Attendance is already submitted
+                  <p className="text-sm font-semibold text-slate-200">
+                    Attendance is finalized for this session
                   </p>
-                  <p className="mt-1 text-xs leading-5 text-slate-500">
-                    This attendance session cannot be modified from the staff
-                    marking page. Use the correction workflow if a correction
-                    is required.
+                  <p className="mt-1 text-xs text-slate-400">
+                    This attendance session is locked and preserved for audit purposes. Use the correction workflow if an adjustment is required.
                   </p>
                 </div>
               </div>
@@ -171,130 +204,136 @@ export default function AttendanceDrawer({
           )}
 
           {isStaffLeave && (
-            <div className="mx-5 mt-4 rounded-xl border border-purple-500/20 bg-purple-500/5 p-4">
+            <div className="rounded-2xl border border-purple-500/20 bg-purple-500/10 p-4">
               <div className="flex gap-3">
                 <CalendarOff size={18} className="mt-0.5 shrink-0 text-purple-300" />
                 <div>
-                  <p className="text-sm font-medium text-purple-200">
-                    Staff is on leave
-                  </p>
-                  <p className="mt-1 text-xs leading-5 text-slate-400">
-                    This session was marked as staff leave. A substitute staff
-                    member or an administrator must mark the attendance.
+                  <p className="text-sm font-semibold text-purple-200">Staff is on leave</p>
+                  <p className="mt-1 text-xs text-purple-300/80">
+                    This session is flagged as staff leave. Substitute staff or an administrator can record attendance.
                   </p>
                 </div>
               </div>
             </div>
           )}
 
-          <div className="space-y-3 p-5">
-            {students.length === 0 ? (
-              <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-8 text-center">
-                <Users size={28} className="mx-auto text-slate-600" />
-                <p className="mt-2 text-sm font-medium text-slate-300">
-                  No students found
-                </p>
-                <p className="mt-1 text-xs text-slate-500">
-                  This class currently has no students available for attendance.
-                </p>
-              </div>
-            ) : (
-              students.map((student, index) => {
-                const status = String(student.status || "PRESENT").toUpperCase();
-                const isAbsent = status === "ABSENT";
+          {filteredStudents.length === 0 ? (
+            <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-8 text-center">
+              <Users size={28} className="mx-auto text-slate-600" />
+              <p className="mt-2 text-sm font-medium text-slate-300">
+                {search ? "No students match your search" : "No students found in this class"}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                {search ? "Clear your search term to see all students." : "Check standard enrollment configuration."}
+              </p>
+            </div>
+          ) : (
+            filteredStudents.map((student, index) => {
+              const status = String(student.status || "PRESENT").toUpperCase();
+              const isAbsent = status === "ABSENT";
+              const missingAbsenceType = isAbsent && !student.absenceTypeId;
 
-                const missingAbsenceType = isAbsent && !student.absenceTypeId;
-
-                return (
-                  <div
-                    key={student.id}
-                    className={`rounded-2xl border p-4 transition ${
-                      isAbsent
-                        ? "border-red-500/20 bg-red-500/5"
-                        : "border-slate-800 bg-slate-900/40"
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-800 text-xs font-semibold text-slate-500">
-                        {index + 1}
+              return (
+                <div
+                  key={student.id}
+                  className={`rounded-2xl border p-4 transition-all duration-200 ${
+                    isAbsent
+                      ? "border-red-500/30 bg-red-500/5 shadow-xs"
+                      : "border-slate-800/90 bg-slate-900/40 hover:border-slate-700/80"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-800 text-xs font-bold text-slate-400">
+                        {student.rollNo ?? student.rollNumber ?? index + 1}
                       </div>
 
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold text-slate-200">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-slate-100">
                           {student.name || student.studentName || "Unnamed student"}
                         </p>
-
-                        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-600">
-                          {(student.rollNo !== undefined ||
-                            student.rollNumber !== undefined) && (
-                            <span>
-                              Roll No: {student.rollNo ?? student.rollNumber}
-                            </span>
-                          )}
-                          {student.admissionNo && (
-                            <span>Admission No: {student.admissionNo}</span>
-                          )}
+                        <div className="flex items-center gap-2 text-xs text-slate-500">
+                          {student.admissionNo && <span>Adm: {student.admissionNo}</span>}
+                          {student.rollNo !== undefined && <span>• Roll: {student.rollNo}</span>}
                         </div>
                       </div>
-
-                      <StatusToggle
-                        disabled={!isEditable}
-                        value={student.status || "PRESENT"}
-                        label={student.name || student.studentName || "student"}
-                        onChange={(nextStatus) =>
-                          onUpdateStudent(student.id, {
-                            status: nextStatus,
-                            ...(nextStatus === "PRESENT"
-                              ? { absenceTypeId: null, remarks: "" }
-                              : {}),
-                          })
-                        }
-                      />
                     </div>
 
-                    {isAbsent && (
-                      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    <StatusToggle
+                      disabled={!isEditable}
+                      value={student.status || "PRESENT"}
+                      label={student.name || student.studentName || "student"}
+                      onChange={(nextStatus) =>
+                        onUpdateStudent(student.id, {
+                          status: nextStatus,
+                          ...(nextStatus === "PRESENT" ? { absenceTypeId: null, remarks: "" } : {}),
+                        })
+                      }
+                    />
+                  </div>
+
+                  {/* Absence Category Selector (Animated expansion when absent) */}
+                  {isAbsent && (
+                    <div className="mt-3.5 pt-3 border-t border-red-500/20 grid gap-2 sm:grid-cols-2">
+                      <div>
                         <select
                           disabled={!isEditable}
                           value={student.absenceTypeId || ""}
-                          aria-label="Absence type"
-                          onChange={(event) =>
+                          aria-label="Absence category"
+                          onChange={(e) =>
                             onUpdateStudent(student.id, {
-                              absenceTypeId: event.target.value || null,
+                              absenceTypeId: e.target.value || null,
                             })
                           }
-                          className={`w-full rounded-xl border bg-slate-900 px-3 py-2.5 text-xs text-slate-200 outline-none transition focus:border-slate-600 disabled:cursor-not-allowed disabled:opacity-50 ${
-                            missingAbsenceType
-                              ? "border-red-500/40"
-                              : "border-slate-800"
+                          className={`w-full rounded-xl border bg-slate-900 px-3 py-2 text-xs font-semibold text-slate-200 outline-hidden transition ${
+                            missingAbsenceType ? "border-red-500 ring-1 ring-red-500/30" : "border-slate-800 focus:border-slate-600"
                           }`}
                         >
-                          <option value="">Select absence type *</option>
-                          {absenceTypes.map((absenceType) => (
-                            <option key={absenceType.id} value={absenceType.id}>
-                              {absenceType.name}
+                          <option value="">Select absence reason *</option>
+                          {absenceTypes.map((t) => (
+                            <option key={t.id} value={t.id}>
+                              {t.name}
                             </option>
                           ))}
                         </select>
                       </div>
-                    )}
-                  </div>
-                );
-              })
-            )}
-          </div>
+
+                      <div>
+                        <input
+                          type="text"
+                          disabled={!isEditable}
+                          value={student.remarks || ""}
+                          placeholder="Optional notes or remarks..."
+                          onChange={(e) =>
+                            onUpdateStudent(student.id, {
+                              remarks: e.target.value,
+                            })
+                          }
+                          className="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-200 outline-hidden focus:border-slate-600"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
         </div>
 
         {/* FOOTER */}
         {isEditable && (
-          <div className="border-t border-slate-800 bg-slate-950 px-5 py-4">
+          <div className="border-t border-slate-800 bg-slate-950 px-6 py-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="text-xs text-slate-600">
-                {absentCount > 0
-                  ? `${absentCount} absent student${
-                      absentCount === 1 ? "" : "s"
-                    } require absence details.`
-                  : "All students are currently marked present."}
+              <div className="text-xs text-slate-400">
+                {absentCount > 0 ? (
+                  <span className="text-amber-400 font-medium">
+                    {absentCount} student{absentCount === 1 ? "" : "s"} marked absent
+                  </span>
+                ) : (
+                  <span className="text-emerald-400 font-medium">
+                    All students marked present
+                  </span>
+                )}
               </div>
 
               <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
@@ -302,7 +341,7 @@ export default function AttendanceDrawer({
                   type="button"
                   onClick={onClose}
                   disabled={busy || leaveBusy}
-                  className="rounded-xl border border-slate-800 px-4 py-2.5 text-sm font-medium text-slate-400 transition hover:bg-slate-900 hover:text-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-xl border border-slate-800 px-4 py-2.5 text-xs font-semibold text-slate-400 hover:bg-slate-900 hover:text-slate-200 disabled:opacity-50"
                 >
                   Cancel
                 </button>
@@ -311,10 +350,10 @@ export default function AttendanceDrawer({
                   type="button"
                   disabled={busy || leaveBusy || students.length === 0}
                   onClick={onRequestSubmit}
-                  className="flex items-center justify-center gap-2 rounded-xl bg-accent px-5 py-2.5 text-sm font-semibold text-on-accent transition hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-2.5 text-xs font-bold text-white shadow-xs transition hover:bg-blue-700 disabled:opacity-50"
                 >
-                  <UserCheck size={17} />
-                  {busy ? "Submitting..." : "Submit Attendance"}
+                  <UserCheck size={16} />
+                  <span>{busy ? "Submitting..." : "Submit Attendance"}</span>
                 </button>
               </div>
             </div>

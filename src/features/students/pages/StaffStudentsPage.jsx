@@ -11,6 +11,7 @@ import {
 import { staffStudentsApi } from "../api/staff-student.api";
 import StudentAbsenceDrawer from "../components/StudentAbsenceDrawer";
 import { useDebouncedValue } from "../../../shared/hooks/useDebouncedValue";
+import ExportButton from "../../../shared/components/ui/ExportButton";
 
 const PAGE_SIZES = [10, 15, 25, 50];
 const SEARCH_DEBOUNCE_MS = 400;
@@ -163,7 +164,21 @@ const StaffStudentsPage = () => {
             <UsersRound size={16} />
             <span>Academic Year {data?.academicYear?.name || "—"}</span>
           </div>
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight">Students</h1>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <h1 className="mt-2 text-2xl font-semibold tracking-tight">Students</h1>
+            <ExportButton
+              filename="student_roster"
+              headers={[
+                { label: "Name", key: "name" },
+                { label: "Admission No", key: "admissionNo" },
+                { label: "Standard", key: "standardName" },
+                { label: "Roll No", key: "rollNo" },
+                { label: "Status", key: "status" },
+              ]}
+              data={data?.students || []}
+              label="Export Roster CSV"
+            />
+          </div>
           <p className="mt-1 text-sm text-slate-400">
             Search and filter students, and view their absence history.
           </p>

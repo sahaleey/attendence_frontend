@@ -9,6 +9,8 @@ import P from "../../../shared/access/permissions";
 import { studentApi } from "../api/student.api";
 import { humanStatus } from "../../../shared/utils/format";
 import { validateStudent } from "../utils/student-validation";
+import { useToast } from "../../../shared/components/ui/Toast";
+import ExportButton from "../../../shared/components/ui/ExportButton";
 
 const STATUSES = ["ACTIVE", "INACTIVE", "ARCHIVED"];
 const blank = { admissionNo: "", name: "", email: "", phone: "", status: "ACTIVE" };
@@ -16,6 +18,7 @@ const blank = { admissionNo: "", name: "", email: "", phone: "", status: "ACTIVE
 export default function Students() {
   const flash = useLocation().state?.flash;
   const { hasPermission } = useAuth();
+  const { pushToast } = useToast();
   const canCreate = hasPermission(P.STUDENTS_CREATE);
   const canUpdate = hasPermission(P.STUDENTS_UPDATE);
   const canRemove = hasPermission(P.STUDENTS_ARCHIVE);
@@ -82,7 +85,7 @@ export default function Students() {
   async function remove(row) {
     if (!window.confirm(`Delete ${row.name} (${row.admissionNo})? Students with enrolment or attendance history cannot be deleted — set them to Inactive/Archived instead.`)) return;
     try { await studentApi.remove(row.id); await load(); }
-    catch (err) { window.alert(err.message); }
+    catch (err) { pushToast(err.message, "error"); }
   }
 
   if (!rows && !error) return <Loading />;

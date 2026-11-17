@@ -1,5 +1,112 @@
-import {useNavigate} from "react-router-dom"; import {useState} from "react"; import {correctionMock} from "../mockData";
-export default function AttendanceAdjustment(){const navigate=useNavigate();const [status,setStatus]=useState("PRESENT");const [reason,setReason]=useState("");
-return <div className="min-h-screen bg-slate-950 text-slate-100"><div className="mx-auto max-w-3xl px-4 py-8 md:px-6"><button onClick={()=>navigate(-1)} className="mb-6 text-sm text-slate-400 hover:text-white">← Back</button><h1 className="text-2xl font-semibold">Adjust attendance</h1><p className="mt-2 text-sm text-slate-400">Mock administrative attendance adjustment page.</p>
-<div className="mt-8 rounded-2xl border border-slate-800 bg-slate-900/50 p-6"><div className="grid gap-4 sm:grid-cols-2"><Info label="Student" value={correctionMock.student.name}/><Info label="Roll no." value={correctionMock.student.rollNo}/><Info label="Date" value={correctionMock.session.date}/><Info label="Class" value={correctionMock.session.className}/><Info label="Subject" value={correctionMock.session.subject}/><Info label="Current status" value={correctionMock.currentAttendance.status}/></div><div className="mt-8 border-t border-slate-800 pt-6"><label className="mb-2 block text-sm">Adjusted status</label><select value={status} onChange={e=>setStatus(e.target.value)} className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3"><option>PRESENT</option><option>ABSENT</option></select><label className="mb-2 mt-5 block text-sm">Adjustment reason</label><textarea required rows={5} value={reason} onChange={e=>setReason(e.target.value)} className="w-full resize-none rounded-xl border border-slate-700 bg-slate-950 px-4 py-3"/><div className="mt-6 flex justify-end gap-3"><button onClick={()=>navigate(-1)} className="rounded-xl border border-slate-700 px-5 py-3 text-sm">Cancel</button><button className="rounded-xl bg-accent px-5 py-3 text-sm font-semibold text-on-accent">Submit adjustment</button></div></div></div></div></div>}
-function Info({label,value}){return <div><p className="text-xs text-slate-500">{label}</p><p className="mt-1 text-sm">{value}</p></div>}
+import React, { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { ArrowLeft, CheckCircle2, ShieldCheck } from "lucide-react";
+import { get, post } from "../../../shared/api/client";
+import { useToast } from "../../../shared/components/ui/Toast";
+
+export default function AttendanceAdjustment() {
+  const navigate = useNavigate();
+  const { attendanceRecordId } = useParams();
+  const { pushToast } = useToast();
+
+  const [status, setStatus] = useState("PRESENT");
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function handleAdjust(e) {
+    e.preventDefault();
+    if (!reason.trim()) {
+      pushToast("Please provide an adjustment reason", "error");
+      return;
+    }
+
+    setBusy(true);
+    try {
+      // Submits administrative direct adjustment via corrections API
+      await post("/attendance/corrections", {
+        attendanceRecordId,
+        oldStatus: status === "PRESENT" ? "ABSENT" : "PRESENT",
+        newStatus: status,
+        reason: `[Direct Adjustment]: ${reason.trim()}`,
+      });
+      pushToast("Direct attendance adjustment submitted successfully!", "success");
+      navigate("/attendance/corrections", { replace: true });
+    } catch (err) {
+      pushToast(err.message || "Failed to submit adjustment", "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mx-auto max-w-xl space-y-6 py-6 animate-in fade-in duration-300">
+      <button
+        type="button"
+        onClick={() => navigate(-1)}
+        className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900 dark:hover:text-slate-100"
+      >
+        <ArrowLeft size={14} /> Back
+      </button>
+
+      <div>
+        <div className="inline-flex items-center gap-1.5 rounded-full bg-purple-500/10 px-3 py-1 text-xs font-semibold text-purple-600 dark:text-purple-400">
+          <ShieldCheck size={14} />
+          Administrative Adjustment
+        </div>
+        <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
+          Adjust Attendance Record
+        </h1>
+        <p className="mt-1 text-xs text-slate-500">
+          Applying managerial override to record: <code className="font-mono text-blue-600 dark:text-blue-400">{attendanceRecordId}</code>
+        </p>
+      </div>
+
+      <form onSubmit={handleAdjust} className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs dark:border-slate-800 dark:bg-slate-900/60 space-y-4">
+        <div>
+          <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+            Adjusted Status
+          </label>
+          <select
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+            className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-semibold dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200"
+          >
+            <option value="PRESENT">Present</option>
+            <option value="ABSENT">Absent</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+            Override Justification *
+          </label>
+          <textarea
+            required
+            rows={4}
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="Document administrative justification for adjusting this record..."
+            className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs text-slate-800 outline-hidden transition focus:border-blue-500 focus:bg-white dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200"
+          />
+        </div>
+
+        <div className="flex justify-end gap-2 pt-2">
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:text-slate-400"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={busy}
+            className="rounded-xl bg-purple-600 px-5 py-2 text-xs font-semibold text-white shadow-xs hover:bg-purple-700 disabled:opacity-50"
+          >
+            {busy ? "Applying..." : "Apply Adjustment"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
